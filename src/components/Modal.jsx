@@ -43,7 +43,7 @@ const ProductModal = ({ product, onClose }) => {
         price: product.price,
         customer_id,
       };
-  
+
       const response = await axios.post(
         "http://localhost:5001/add-to-cart",
         payload,
@@ -53,7 +53,7 @@ const ProductModal = ({ product, onClose }) => {
           },
         }
       );
-  
+
       if (response.status === 201) {
         console.log("Product added to cart:", response.data);
         alert(response.data.message);
@@ -62,7 +62,7 @@ const ProductModal = ({ product, onClose }) => {
       console.error("Error adding product to cart:", error);
       alert(
         error.response?.data?.message ||
-        "Failed to add product to cart. Please try again."
+          "Failed to add product to cart. Please try again."
       );
     } finally {
       setQuantity(1);
@@ -70,25 +70,30 @@ const ProductModal = ({ product, onClose }) => {
       handleClose();
     }
   };
-  
-  
-  
 
   const cancelAddToCart = () => {
-    setQuantity(1); 
+    setQuantity(1);
     setShowQuantitySelector(false);
   };
 
   const handleClose = () => {
-    setQuantity(1); 
+    setQuantity(1);
     setShowQuantitySelector(false);
     onClose();
   };
 
+  const handleOverlayClick = (e) => {
+    if (e.target.className === "modal-overlay") {
+      handleClose();
+    }
+  };
+
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" onClick={handleOverlayClick}>
       <div className="modal-content">
-        <button className="close-button" onClick={handleClose}>X</button>
+        <button className="close-button" onClick={handleClose}>
+          X
+        </button>
         <div className="modal-details">
           <div className="modal-image-container">
             <div className="slide-image">
@@ -102,17 +107,14 @@ const ProductModal = ({ product, onClose }) => {
 
           <div className="modal-info">
             <h2>{product.name || "Product Name"}</h2>
-            <p><strong>Price:</strong> Rs {product.price || "N/A"}</p>
+            <p>
+              <strong>Price:</strong> Rs {product.price || "N/A"}
+            </p>
 
             <ul>
               <strong>Description:</strong>
-              {/* {(product.description || []).map((desc, idx) => (
-                <li key={idx}>{desc}</li>
-              ))} */}
-              <p>
-                {product.description}
-              </p>
-            </ul> 
+              <p>{product.description}</p>
+            </ul>
 
             <ul>
               <strong>Benefits:</strong>
@@ -151,7 +153,10 @@ const ProductModal = ({ product, onClose }) => {
                   <button onClick={handleIncrement}>+</button>
                 </div>
                 <div className="quantity-actions">
-                  <button onClick={confirmAddToCart} className="confirm-cart-btn">
+                  <button
+                    onClick={confirmAddToCart}
+                    className="confirm-cart-btn"
+                  >
                     Confirm
                   </button>
                   <button onClick={cancelAddToCart} className="cancel-cart-btn">

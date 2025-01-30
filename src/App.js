@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from "react-router-dom";
 import "./input.css";
 import Admin from "./components/admin.jsx";
 import Navbar from "./components/Navbar.jsx";
@@ -18,12 +18,39 @@ import Login from "./components/Login.jsx";
 import Register from "./components/Register.jsx";
 import Profile from "./components/Profile.jsx";
 
-function App() {
-  const PrivateRoute = ({ children }) => {
-    const token = localStorage.getItem("token");
-    return token ? children : <Navigate to="/login" />;
-  };
+function PrivateRoute({ children }) {
+  const token = localStorage.getItem("token");
+  const [showPopup, setShowPopup] = useState(false);
+  const navigate = useNavigate();
 
+  useEffect(() => {
+    if (!token) {
+      setShowPopup(true);
+    }
+  }, [token]);
+
+  return token ? (
+    children
+  ) : (
+    <>
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+            <p className="text-lg font-semibold">You need to be logged in to access this page.</p>
+            <button
+              onClick={() => navigate("/login")}
+              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function App() {
   useEffect(() => {
     const loadingScreen = document.querySelector(".loading");
 
@@ -45,24 +72,55 @@ function App() {
 
   return (
     <Router>
-      <div
-        className="App overflow-x-hidden relative"
-        style={{ background: "#F6E7E5" }}
-      >
+      <div className="App overflow-x-hidden relative" style={{ background: "#F6E7E5" }}>
         <div className="loading"></div>
 
         <Navbar />
 
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<><Hero /><Arrivals /><BestSelling /><Extra /><Insta /></>} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/policy" element={<Policy />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Protected Routes */}
+          {/* Private Routes */}
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <>
+                  <Hero />
+                  <Arrivals />
+                  <BestSelling />
+                  <Extra />
+                  <Insta />
+                </>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <PrivateRoute>
+                <Products />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/blog"
+            element={
+              <PrivateRoute>
+                <Blog />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/policy"
+            element={
+              <PrivateRoute>
+                <Policy />
+              </PrivateRoute>
+            }
+          />
           <Route
             path="/cart"
             element={
@@ -87,13 +145,12 @@ function App() {
               </PrivateRoute>
             }
           />
-
           <Route
             path="/admin"
             element={
-              //add private route here
+              <PrivateRoute>
                 <Admin />
-               
+              </PrivateRoute>
             }
           />
         </Routes>

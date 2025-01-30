@@ -31,6 +31,7 @@ const CartPage = () => {
           alert("Invalid token. Please log in again.");
           return;
         }
+      
         const response = await axios.post(
           "http://localhost:5001/get-cart",
           { customer_id },
@@ -40,8 +41,8 @@ const CartPage = () => {
             },
           }
         );
-
-        if (response.data && response.data.data) {
+      
+        if (response.data?.data?.length > 0 && response.data.data[0]?.items) {
           const items = response.data.data[0].items.map(item => ({
             product_name: item.name,
             p_id: item.p_id,
@@ -50,12 +51,14 @@ const CartPage = () => {
           }));
           setCartItems(items);
         } else {
-          alert("No cart items found.");
+          setCartItems([]); // Ensure cart is empty instead of throwing an error
+          console.warn("Cart is empty.");
         }
       } catch (error) {
         console.error("Error fetching cart:", error.response?.data || error.message);
         alert("Failed to load cart items.");
       }
+      
     };
 
     fetchCartItems();

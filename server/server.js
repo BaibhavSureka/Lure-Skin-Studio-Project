@@ -799,6 +799,7 @@ app.get("/get-products",async(req,res)=>{
     if(fetchError) throw fetchError
     if(products){
       res.status(201).json({data:products})
+      // console.log(products)
     }
   } catch (error) {
     res.status(500).json({message:error.message})
@@ -811,12 +812,42 @@ app.post("/get-product",async(req,res)=>{
     const {data:products,error:fetchError}=await supabase.from('products').select('*').eq('id',p_id)
     if(fetchError) throw fetchError
     if(products){
-      res.status(201).json({data:products})
+      res.status(201).json({data:products},()=>console.log(products))
+      
     }
   } catch (error) {
     res.status(500).json({message:error.message})
   }
 })
+
+const checkAuth = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) {
+    return res.status(401).json({ error: "No token provided. Please log in or sign up." });
+  }
+
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ error: "No token provided. Please log in or sign up." });
+  }
+
+  jwt.verify(token, secretKey, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ error: "Invalid or expired token. Please log in again." });
+    }
+    req.id = decoded.id; // Attach the user ID to the request object
+    next(); // Proceed to the next middleware or route handler
+  });
+};
+
+// Apply middleware globally
+app.use((req, res, next) => {
+  // Exclude login and signup routes
+  if (req.path === "/user/login" || req.path === "/user/register") {
+    return next();
+  }
+  checkAuth(req, res, next);
+});
 
 const PORT = 5001;
 app.listen(PORT, () => {

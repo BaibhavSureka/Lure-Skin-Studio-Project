@@ -154,9 +154,12 @@ const Products = () => {
     };
   };
 
-  const handleIncrement = () => setQuantity((prev) => prev + 1);
+  const handleIncrement = (maxLimit) => {
+    setQuantity((prev) => (prev < maxLimit ? prev + 1 : prev));
+  };
+  
   const handleDecrement = () => setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
-
+  
   const handleConfirm = async (product) => {
     const authToken = localStorage.getItem("token");
     console.log(quantity);
@@ -209,11 +212,16 @@ const Products = () => {
           const isExpanded = showQuantitySelector === product; // Check if the tile should be expanded
           return (
             <div key={index} className={`product-card ${isExpanded ? "expanded" : ""}`}>
+             {product.quantity < 30 && (
+  <div className="product-stock-alert">⚠️ Going out of stock!</div>
+)}
+
               <img src={product.images[0]} alt={product.name} className="product-image" onClick={() => openModal(product)} />
 
               <div className="product-details text-left">
-                <p className="product-price">Price: Rs {product.price}</p>
                 <h6 className="product-name">{product.name}</h6>
+                <p className="product-price">Price: Rs {product.price}</p>
+                <h5>{product.quantity}</h5>
               </div>
 
               {/* Cart Icon with Expansion Control */}
@@ -231,9 +239,10 @@ const Products = () => {
               {isExpanded && (
                 <div className="quantity-selector">
                   <div className="quantity-controls">
-                    <button onClick={handleDecrement}>-</button>
+                    <button onClick={handleDecrement} >-</button>
                     <span>{quantity}</span>
-                    <button onClick={handleIncrement}>+</button>
+                    <button onClick={() => handleIncrement(product.quantity)} style={{display:"flex",justifyContent:"center",alignItems:"center"}}>+</button>
+
                   </div>
                   <div className="quantity-actions">
                     <button onClick={() => handleConfirm(product)} className="confirm-btn">Confirm</button>

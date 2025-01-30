@@ -39,10 +39,7 @@
   transition: transform 0.3s ease;
 }
 
-.close-button:hover {
-  transform: rotate(90deg);
-}
-
+ 
 .modal-details {
   display: flex;
   flex-direction: row;
