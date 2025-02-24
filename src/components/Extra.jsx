@@ -1,21 +1,29 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import "../components/extra.css";
-import img1 from "../Product Images/soaps/Charcoal.JPG";
-import img2 from "../Product Images/alovera gel/image0.jpeg";
+import img1 from "../Product Images/soaps/Charcoal_1.png";
+import img2 from "../Product Images/alovera gel/Alovera_1.png";
 
 const Extra = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="relative" style={{ height: "150vh", width: "100%" }}>
+    <div className="relative" style={{ height: "105vh", width: "100%" }}>
       <div className="absolute top-0 left-0 w-full h-full flex">
         <div
-          style={{ backgroundImage: `url(${img1})`, backgroundSize: "cover" }}
+          style={{
+            backgroundImage: `url(${img1})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
           className="w-1/2 h-full"
         ></div>
         <div
-          style={{ backgroundImage: `url(${img2})`, backgroundSize: "cover" }}
+          style={{
+            backgroundImage: `url(${img2})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
           className="w-1/2 h-full"
         ></div>
       </div>

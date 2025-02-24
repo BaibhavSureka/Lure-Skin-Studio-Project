@@ -15,8 +15,8 @@ const Login = () => {
     e.preventDefault();
   
     try {
-      const response = await axios.post("http://localhost:5001/user/login", { email, password });
-  
+      const response = await axios.post("https://lure-skin-studio.onrender.com/user/login", { email, password });
+      
       if (response.status === 200) {
         localStorage.setItem("token", response.data.token);
         alert("Login successful!");

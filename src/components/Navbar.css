@@ -7,7 +7,8 @@
 }
 
 .logo {
-  width: 18%;
+  width: 15%;
+  transition: width 0.3s ease;
 }
 
 .navbar {
@@ -20,6 +21,9 @@
 /* Desktop Navbar */
 .desktop-navbar {
   list-style: none;
+  display: flex;
+  justify-content: space-around;
+  gap: 20px;
 }
 
 .navbar-item {
@@ -27,6 +31,7 @@
   cursor: pointer;
   padding: 10px 15px;
   font-size: 16px;
+  transition: color 0.3s ease;
 }
 
 .navbar-item:hover::after {
@@ -72,7 +77,7 @@
   display: none;
   flex-direction: column;
   gap: 10px;
-  background-color: #fff4f4; /* Matched with the theme */
+  background-color: #fff4f4;
   padding: 20px;
   border-top: 1px solid #ddd;
 }
@@ -97,7 +102,7 @@
   margin: 10px 0;
   padding: 0;
   display: none;
-  background-color: #fff4f4; /* Matched old color */
+  background-color: #fff4f4;
   border-radius: 5px;
   position: relative;
   left: 0;
@@ -110,7 +115,7 @@
 .dropdown-menu-mobile li {
   padding: 10px;
   text-align: left;
-  background-color: #fff4f4; /* Matched old color */
+  background-color: #fff4f4;
   border-bottom: 1px solid #ddd;
 }
 
@@ -148,5 +153,48 @@
 
   .mobile-navbar .flex.items-center {
     justify-content: flex-start;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .logo {
+    width: 30%;
+  }
+
+  .desktop-navbar {
+    display: flex;
+    justify-content: space-around;
+    padding: 0 10px;
+  }
+
+  .navbar-item {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .dropdown-menu {
+    min-width: 120px;
+  }
+
+  .dropdown-menu li {
+    padding: 8px 12px;
+  }
+
+  .mobile-navbar {
+    display: none;
+  }
+}
+
+@media (min-width: 1025px) {
+  .logo {
+    width: 15%;
+  }
+
+  .desktop-navbar {
+    display: flex;
+  }
+
+  .mobile-navbar {
+    display: none;
   }
 }

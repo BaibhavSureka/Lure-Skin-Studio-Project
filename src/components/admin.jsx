@@ -21,6 +21,8 @@ const Admin = () => {
     images: [],
   });
   const [error, setError] = useState("");
+  const [imageLoading, setImageLoading] = useState(false); 
+
 
   const categories = ["body", "face", "hair", "skincare", "fragrance"];
 
@@ -32,33 +34,34 @@ const Admin = () => {
         navigate("/login");
         return;
       }
-
+    
       try {
-        const response = await fetch("http://localhost:5001/admin", {
-          method: "GET",
+        console.log(token);
+        const response = await axios.get("https://lure-skin-studio.onrender.com/verify_admin", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
-
-        if (response.ok) {
+    
+        if (response.status === 200) {
           setIsAdmin(true);
         } else {
-          const errorData = await response.json();
-          alert(errorData.message || "You are not authorized to access this page.");
+          alert(response.data?.error || "You are not authorized to access this page.");
           navigate("/login");
         }
+        
       } catch (err) {
-        console.error("Error verifying admin token:", err);
-        alert("An error occurred. Please try again.");
+        console.error("Error verifying admin token:", err?.response?.data || err.message);
+        alert(err?.response?.data?.error || "An error occurred. Please try again.");
         navigate("/login");
       } finally {
         setLoading(false);
       }
     };
+    
 
     verifyAdmin();
-  }, [navigate]);
+  }, [navigate,axios]);
 
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
@@ -92,7 +95,7 @@ const Admin = () => {
     };
   
     try {
-      const response = await axios.post("http://localhost:5001/upload", productData, {
+      const response = await axios.post("https://lure-skin-studio.onrender.com/upload", productData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -132,8 +135,9 @@ const Admin = () => {
     const formData = new FormData();
     formData.append("avatar", file);
   
+    setImageLoading(true); // Start loading
     try {
-      const response = await axios.post("http://localhost:5001/upload/pic", formData, {
+      const response = await axios.post("https://lure-skin-studio.onrender.com/upload/pic", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
   
@@ -151,8 +155,11 @@ const Admin = () => {
     } catch (error) {
       console.error("Error uploading image:", error.response?.data || error.message);
       alert("Failed to upload image. Please try again.");
+    } finally {
+      setImageLoading(false); // Stop loading
     }
   };
+  
   
 
   if (loading) {
@@ -265,14 +272,17 @@ const Admin = () => {
           </select>
         </div>
         <div>
-          <label>Product Image:</label>
-          <input
-            type="file"
-            name="images"
-            onChange={(e) => handleImageUpload(e.target.files[0])}
-            required
-          />
-        </div>
+        <label>Product Image:</label>
+        <input
+          type="file"
+          name="images"
+          onChange={(e) => handleImageUpload(e.target.files[0])}
+          disabled={imageLoading} // Disable input when loading
+          required
+        />
+        {imageLoading && <span className="spinner">Uploading...</span>} {/* Add loading indicator */}
+      </div>
+
         <div className="buttons">
           <button type="submit">Add Product</button>
           <button type="button" onClick={handleClear} className="clear-button">

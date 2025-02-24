@@ -2,16 +2,26 @@ import React, { useState } from "react";
 import { FaShoppingCart } from "react-icons/fa";
 import "./modal.css";
 import axios from "axios";
-import { jwtDecode } from "jwt-decode";
+import {jwtDecode} from "jwt-decode"; // Fix: Use default export.
 
-const ProductModal = ({ product, onClose }) => {
+const ProductModal = ({ product, onClose, maxQuantity }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [showQuantitySelector, setShowQuantitySelector] = useState(false);
 
   if (!product) return null;
 
-  const handleIncrement = () => setQuantity((prev) => prev + 1);
+  const handleIncrement = () => {
+    setQuantity((prev) => {
+      if (prev < maxQuantity) {
+        return prev + 1;
+      } else {
+        alert(`Maximum quantity available: ${maxQuantity}`);
+        return prev;
+      }
+    });
+  };
+
   const handleDecrement = () => setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
 
   const handleAddToCartClick = () => {
@@ -21,66 +31,68 @@ const ProductModal = ({ product, onClose }) => {
   const confirmAddToCart = async () => {
     try {
       const authToken = localStorage.getItem("token");
-      let customer_id;
       if (!authToken) {
         alert("User is not authenticated. Please log in.");
         return;
       }
+
+      let customer_id;
       try {
         const decodedToken = jwtDecode(authToken);
         customer_id = decodedToken.id;
-        if (!customer_id) {
-          throw new Error("Customer ID not found in token");
-        }
+        if (!customer_id) throw new Error("Customer ID not found in token");
       } catch (error) {
         console.error("Error decoding token:", error.message);
         alert("Invalid token. Please log in again.");
         return;
       }
+
       const payload = {
-        id: product.id,
+        p_id: product.id,
         name: product.name,
         price: product.price,
-        customer_id,
+        quantity,
       };
-  
-      const response = await axios.post(
-        "http://localhost:5001/add-to-cart",
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
+
+      try {
+        const response = await axios.post(
+          "https://lure-skin-studio.onrender.com/add-to-cart",
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          }
+        );
+
+        if (response.status === 201) {
+          // console.log("Cart updated successfully:", response.data.data);
+          alert("Cart updated successfully");
         }
-      );
-  
-      if (response.status === 201) {
-        console.log("Product added to cart:", response.data);
-        alert(response.data.message);
+      } catch (error) {
+        console.error("Error adding to cart:", error.response?.data || error.message);
+        alert(
+          error.response?.data?.message ||
+            "Failed to add product to cart. Please try again."
+        );
       }
     } catch (error) {
-      console.error("Error adding product to cart:", error);
-      alert(
-        error.response?.data?.message ||
-        "Failed to add product to cart. Please try again."
-      );
+      console.error("Error adding product to cart:", error.message);
+      alert("Failed to add product to cart. Please try again.");
     } finally {
       setQuantity(1);
       setShowQuantitySelector(false);
       handleClose();
     }
   };
-  
-  
-  
 
   const cancelAddToCart = () => {
-    setQuantity(1); 
+    setQuantity(1);
     setShowQuantitySelector(false);
   };
 
   const handleClose = () => {
-    setQuantity(1); 
+    setQuantity(1);
     setShowQuantitySelector(false);
     onClose();
   };
@@ -88,7 +100,9 @@ const ProductModal = ({ product, onClose }) => {
   return (
     <div className="modal-overlay">
       <div className="modal-content">
-        <button className="close-button" onClick={handleClose}>X</button>
+        <button className="close-button" onClick={handleClose}>
+          X
+        </button>
         <div className="modal-details">
           <div className="modal-image-container">
             <div className="slide-image">
@@ -102,17 +116,14 @@ const ProductModal = ({ product, onClose }) => {
 
           <div className="modal-info">
             <h2>{product.name || "Product Name"}</h2>
-            <p><strong>Price:</strong> Rs {product.price || "N/A"}</p>
+            <p>
+              <strong>Price:</strong> Rs {product.price || "N/A"}
+            </p>
 
             <ul>
               <strong>Description:</strong>
-              {/* {(product.description || []).map((desc, idx) => (
-                <li key={idx}>{desc}</li>
-              ))} */}
-              <p>
-                {product.description}
-              </p>
-            </ul> 
+              <p>{product.description}</p>
+            </ul>
 
             <ul>
               <strong>Benefits:</strong>
@@ -150,6 +161,23 @@ const ProductModal = ({ product, onClose }) => {
                   <span>{quantity}</span>
                   <button onClick={handleIncrement}>+</button>
                 </div>
+
+                {/* Warning Messages */}
+                {maxQuantity <= 5 && (
+                  <p
+                    style={{
+                      color: "red",
+                      fontSize: "14px",
+                      marginTop: "8px",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    {maxQuantity === 1
+                      ? "Only 1 item left in stock!"
+                      : `Only ${maxQuantity} items left in stock!`}
+                  </p>
+                )}
+
                 <div className="quantity-actions">
                   <button onClick={confirmAddToCart} className="confirm-cart-btn">
                     Confirm
@@ -160,6 +188,7 @@ const ProductModal = ({ product, onClose }) => {
                 </div>
               </div>
             )}
+
           </div>
         </div>
       </div>

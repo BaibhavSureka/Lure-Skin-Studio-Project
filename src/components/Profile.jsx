@@ -18,7 +18,7 @@ const Profile = () => {
           throw new Error("User not logged in");
         }
 
-        const response = await axios.get("http://localhost:5001/user/profile", {
+        const response = await axios.get("https://lure-skin-studio.onrender.com/user/profile", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -49,7 +49,7 @@ const Profile = () => {
     try {
       const token = localStorage.getItem("token");
       if (token) {
-        await axios.post("http://localhost:5001/user/logout", null, {
+        await axios.post("https://lure-skin-studio.onrender.com/user/logout", null, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

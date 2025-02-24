@@ -10,15 +10,15 @@ const BestSelling = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [products, setProducts] = useState([]);
+  const [expandedProduct, setExpandedProduct] = useState(null); // Track expanded card
 
   useEffect(() => {
     AOS.init({ duration: 1000 });
 
     const getAllProducts = async () => {
       try {
-        const response = await axios.get("http://localhost:5001/get-products");
+        const response = await axios.get("https://lure-skin-studio.onrender.com/get-products");
         const allProducts = response.data.data;
-        console.log(allProducts)
         const sortedProducts = allProducts
           .sort((a, b) => b.quantity_sold - a.quantity_sold)
           .map((product) => ({
@@ -29,7 +29,7 @@ const BestSelling = () => {
             ...product,
           }));
 
-          setProducts(sortedProducts.slice(0, 6));
+        setProducts(sortedProducts.slice(0, 6));
       } catch (error) {
         console.error("Error fetching products:", error.message);
       }
@@ -61,11 +61,21 @@ const BestSelling = () => {
     setSelectedProduct(null);
   };
 
+  const handleCardExpand = (product) => {
+    setExpandedProduct((prev) => (prev === product ? null : product));
+  };
+
   return (
     <div className="arrivals-section open-up" style={{ width: "100vw" }} data-aos="zoom-out">
       <h2 className="section-title text-uppercase mb-0">BEST SELLING</h2>
       <div className="carousel-container">
-        <button className="arrow-btn left-arrow" onClick={prevProduct}>←</button>
+        <button
+          className="arrow-btn left-arrow"
+          onClick={prevProduct}
+          disabled={products.length <= visibleItemsCount}
+        >
+          ←
+        </button>
 
         <div
           className="carousel"
@@ -77,22 +87,41 @@ const BestSelling = () => {
           {products.map((product) => (
             <div
               key={product.id}
-              className="arrivals-card"
-              onClick={() => openModal(product)}
+              className={`arrivals-card ${expandedProduct === product ? "expanded" : ""}`}
             >
-              <ArrivalsCard img={product.img} name={product.name} price={product.price} />
+              <ArrivalsCard
+                img={product.img}
+                name={product.name}
+                price={product.price}
+                id={product.id}
+                description={product.description}
+                isExpanded={expandedProduct === product}
+                onExpand={() => handleCardExpand(product)}
+                onCartClick={() => handleCardExpand(product)}
+                onTileClick={() => openModal(product)}
+                maxQuantity={product.quantity}
+              />
+
             </div>
           ))}
         </div>
 
-        <button className="arrow-btn right-arrow" onClick={nextProduct}>→</button>
+        <button
+          className="arrow-btn right-arrow"
+          onClick={nextProduct}
+          disabled={products.length <= visibleItemsCount}
+        >
+          →
+        </button>
       </div>
 
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}
-          onClose={(e) => closeModal(e)}
+          onClose={closeModal}
+          maxQuantity={selectedProduct.quantity}
         />
+      
       )}
     </div>
   );

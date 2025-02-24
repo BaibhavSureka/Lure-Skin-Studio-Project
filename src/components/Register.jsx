@@ -23,7 +23,7 @@ const Register = () => {
     }
 
     try {
-      const response = await axios.post("http://localhost:5001/user/register", {
+      const response = await axios.post("https://lure-skin-studio.onrender.com/user/register", {
         name,
         email,
         address,

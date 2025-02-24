@@ -3,22 +3,34 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
-import axios from "axios";
+// import axios from "axios";
 import dotenv from "dotenv";
 import multer from "multer";
-import cloudinary from "cloudinary"
+import cloudinary from "cloudinary";
 import jwt from "jsonwebtoken";
 import Razorpay from "razorpay";
-import crypto from "crypto"
+import crypto from "crypto";
+import path from "path";
+import fs from "fs";
+import twilio from "twilio";
+
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+const __dirname1 = path.resolve();
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/");
+    const uploadDir = "uploads/";
+    // Check if directory exists, create if not
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -27,22 +39,29 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-const secretKey = "secret_key";
+const secretKey = process.env.JWT_SECRET;
 
-const supabaseUrl = "https://vmvxxjofzfpwvatbquhy.supabase.co";
-const supabaseKey ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtdnh4am9memZwd3ZhdGJxdWh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzAxNzA1NjMsImV4cCI6MjA0NTc0NjU2M30.rt7ORhBz7UaHSE_gTWvX-D82uj_CQidpKcC1hVLLovA";
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 cloudinary.config({
-  cloud_name: "dtuqpup4a",
-  api_key: "291317165429892",
-  api_secret: "qJq00V57nGffgM_ev-BcG5Tbmnk",
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_KEY,
+  api_secret: process.env.CLOUDINARY_SECRET,
 });
 
-const razorpayId = "rzp_test_cpR703nvZzCIdo";
-const razorpaySecret = "3r0f7OjbhQUoEgqNTSnePXgI";
-const whatsappToken = "EAAXEAIh0ErgBO8lmCtFNfPy7zNA18KVs1ZA8lu5AyD7YV59x2HMG0mTJdcJbVF3ZAjQZCIklmrKCAZBcYbQiDjrEXLoKfu6wrPo5JtAAn1tLK47ZApTxbbY4h8WzgJkboZCx105LJcBz2c5vgDCQE3TGPUL5jphVgZBZBMf2t9ZBtGIiFCqVzGWuCEKna1WY5Nl6q";
-const whatsappId = "470207039510486";
+const razorpayId = process.env.RAZORPAY_ID;
+const razorpaySecret = process.env.RAZORPAY_SECRET;
+// const whatsappToken = process.env.WHATSAPP_TOKEN;
+// const whatsappId = process.env.WHATSAPP_ID;
+
+const accountSid = process.env.TWILIO_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+const razorpayWebhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+const client = twilio(accountSid, authToken);
 
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -64,8 +83,9 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-const verifyAdminToken = async (req, res, next) => {
+const verifyAdminToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
+  console.log(`The authHearder received is ${authHeader}\n`);
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res
       .status(401)
@@ -73,15 +93,16 @@ const verifyAdminToken = async (req, res, next) => {
   }
 
   const token = authHeader.split(" ")[1];
+  console.log(`Token is ${token}\n`);
   jwt.verify(token, secretKey, async (err, decoded) => {
     if (err) {
+      console.error("Token verification error:", err.message);
       return res.status(401).json({ error: "Invalid or expired token" });
     }
 
     try {
-      req.id = decoded.id; // Set the user ID for further use
+      req.id = decoded.id;
 
-      // Fetch user role from the database
       const { data: user, error: fetchError } = await supabase
         .from("users")
         .select("role")
@@ -91,11 +112,13 @@ const verifyAdminToken = async (req, res, next) => {
       if (fetchError || !user) {
         throw new Error("Failed to fetch user data");
       }
-
-      if (user.role === "admin") {
-        return next(); // Proceed if the user is an admin
+      console.log(user.role);
+      if (user.role == "admin") {
+        return next();
       } else {
-        return res.status(403).json({ error: "You are not authorized as admin" });
+        return res
+          .status(403)
+          .json({ error: "You are not authorized as admin" });
       }
     } catch (error) {
       console.error("Error verifying admin token:", error.message);
@@ -104,20 +127,31 @@ const verifyAdminToken = async (req, res, next) => {
   });
 };
 
-app.get("/admin", verifyAdminToken, (req, res) => {
-  res.status(200).json({ message: "Welcome to the Admin page" });
-});
-
 const uploadCloudinary = async (localFilePath) => {
   try {
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "image",
     });
-    return response.url;
+
+    // Clean up the local file after uploading to Cloudinary
+    fs.unlinkSync(localFilePath);
+
+    return response.secure_url;
   } catch (error) {
-    console.error(error.message);
+    console.error("Cloudinary upload error:", error.message);
+
+    // Clean up the local file in case of an error
+    if (fs.existsSync(localFilePath)) {
+      fs.unlinkSync(localFilePath);
+    }
+
+    throw error; // Pass the error to the calling function
   }
 };
+
+app.get("/verify_admin", verifyAdminToken, (req, res) => {
+  res.status(200).json({ message: "Welcome to the Admin page" });
+});
 
 app.post("/user/register", async (req, res) => {
   // Destructure user inputs from request body
@@ -160,7 +194,7 @@ app.post("/user/register", async (req, res) => {
       ...data[0],
       password: undefined, // Explicitly exclude the password
     };
-    const token = jwt.sign({ id: data.id}, secretKey, {
+    const token = jwt.sign({ id: data.id }, secretKey, {
       expiresIn: "1h",
     });
     // Respond with success
@@ -178,7 +212,6 @@ app.post("/user/register", async (req, res) => {
     });
   }
 });
-
 
 app.post("/user/login", async (req, res) => {
   const { email, password } = req.body;
@@ -199,14 +232,13 @@ app.post("/user/login", async (req, res) => {
         message: "Invalid email or password",
       });
     }
-
     const isMatch = await bcrypt.compare(password, users.password);
     if (!isMatch) {
       return res.status(401).json({
         message: "Invalid email or password",
       });
     }
-    const token = jwt.sign({ id: users.id}, secretKey, {
+    const token = jwt.sign({ id: users.id }, secretKey, {
       expiresIn: "1h",
     });
     res.status(200).json({
@@ -217,7 +249,7 @@ app.post("/user/login", async (req, res) => {
         phone: users.phone,
         name: users.name,
       },
-      token
+      token,
     });
   } catch (err) {
     console.error("Unexpected Error:", err);
@@ -274,9 +306,11 @@ app.post("/user/logout", (req, res) => {
 
 app.post("/upload/pic", upload.single("avatar"), async (req, res) => {
   try {
+    console.log("File received:", req.file.path); // Debugging log
     const responseUrl = await uploadCloudinary(req.file.path);
     res.json({ picUrl: responseUrl });
   } catch (error) {
+    console.error("Error in /upload/pic route:", error.message);
     res.status(500).send("Error uploading image");
   }
 });
@@ -309,7 +343,9 @@ app.post("/upload", verifyAdminToken, async (req, res) => {
     !quantity ||
     !category
   ) {
-    return res.status(400).json({ message: "Missing or invalid required fields" });
+    return res
+      .status(400)
+      .json({ message: "Missing or invalid required fields" });
   }
 
   try {
@@ -351,171 +387,214 @@ app.post("/upload", verifyAdminToken, async (req, res) => {
   }
 });
 
-app.post("/create-and-send-payment-link",verifyToken, async (req, res) => {
-  const { amount, customerName, customerContact, customerEmail, orderDetails } = req.body;
-
-  if (!amount || !customerName || !customerContact || !customerEmail || !orderDetails || orderDetails.length === 0) {
+app.post("/create-and-send-payment-link", verifyToken, async (req, res) => {
+  const { amount, customerName, customerContact, customerEmail, orderDetails } =
+    req.body;
+  console.log(customerContact);
+  if (
+    !amount ||
+    !customerName ||
+    !customerContact ||
+    !customerEmail ||
+    !orderDetails ||
+    orderDetails.length === 0
+  ) {
     console.warn("Request validation failed: missing required fields");
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  const razorpay = new Razorpay({
-    key_id: razorpayId,
-    key_secret: razorpaySecret,
-  });
-
-  const paymentLinkData = {
-    upi_link: false,
-    amount: amount * 100,
-    currency: "INR",
-    accept_partial: false,
-    first_min_partial_amount: 100,
-    expire_by: Math.floor(Date.now() / 1000) + 86400,
-    reference_id: `TS${Date.now()}${Math.floor(Math.random() * 1000)}`,
-    description: `Payment for ${customerName}`,
-    customer: {
-      contact: customerContact,
-      email: customerEmail,
-      name: customerName,
-    },
-    notify: {
-      sms: true,
-      email: true,
-    },
-    reminder_enable: true,
-    notes: {
-      policy_name: "Policy 1",
-      customer_id:req.id,
-    },
-    callback_url: "http://localhost:3000/cart",
-    callback_method: "get",
-  };
-
-  let paymentLink;
   try {
-    console.log("Attempting to create a payment link");
-    paymentLink = await razorpay.paymentLink.create(paymentLinkData);
-    console.log("Payment link created successfully:", paymentLink.short_url);
-  } catch (error) {
-    console.error("Error creating payment link:", error.message);
-    return res.status(500).json({ error: "Failed to create payment link" });
-  }
-
-  const orderItems = orderDetails
-    .map(item => `- **${item.productName}**: ₹${item.price} x ${item.quantity}`)
-    .join("\n");
-
-  const message = `
-Hello ${customerName},
-
-Thank you for your order!
-
-Here are the payment details:
-- Amount: ₹${amount}
-- Description: Payment for ${customerName}
-
-Order Details:
-${orderItems}
-
-Click the link below to complete your payment:
-${paymentLink.short_url}
-
-If you have any questions, feel free to reply to this message.
-
-Thank you for shopping with us!`;
-
-try {
-  console.log("Attempting to send WhatsApp message to:", customerContact);
-
-  const { data: users, error: fetchError } = await supabase
-    .from("users")
-    .select("hasContacted")
-    .eq("phone", customerContact)
-    .single();
-
-  if (fetchError) {
-    console.error("Error fetching user info:", fetchError.message);
-    throw new Error("Failed to check contact status");
-  }
-
-  if (!users || !users.hasContacted) {
-    console.log("Customer not contacted before, sending template message...");
-    await axios.post(
-      `https://graph.facebook.com/v21.0/${whatsappId}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to: customerContact,
-        type: "template",
-        template: {
-          name: "hello_world",
-          language: { code: "en_US" },
-        },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${whatsappToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const { data: updatedData, error: updateError } = await supabase
+    const { data: userData, error: userFetchError } = await supabase
       .from("users")
-      .update({ hasContacted: true })
-      .eq("phone", customerContact);
+      .select("id, address, hasContacted")
+      .eq("email", customerEmail)
+      .single();
 
-    if (updateError) {
-      console.error("Error updating user contact status:", updateError.message);
-      throw new Error("Failed to update contact status");
+    if (userFetchError) {
+      console.error("Error fetching user data:", userFetchError.message);
+      return res.status(500).json({ error: "Failed to fetch user data" });
     }
 
-    console.log("Template message sent and user marked as contacted.");
-    res.status(200).json({
-      message: "Payment link created and template sent via WhatsApp",
-      paymentLink: paymentLink.short_url,
-    });
-  } else {
-    console.log("Customer already contacted, sending detailed payment info...");
-    const whatsappResponse = await axios.post(
-      `https://graph.facebook.com/v21.0/${whatsappId}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to: customerContact,
-        type: "text",
-        text: { body: message },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${whatsappToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const customerId = userData.id;
+    const customerAddress = userData.address || "Address not provided";
+    // const hasContacted = userData.hasContacted;
 
-    console.log("Detailed payment info sent successfully:", whatsappResponse.data);
-    res.status(200).json({
-      message: "Payment link created and detailed info sent via WhatsApp",
-      paymentLink: paymentLink.short_url,
+    for (const item of orderDetails) {
+      const { productName, quantity } = item;
+
+      const { data: productData, error: fetchProductError } = await supabase
+        .from("products")
+        .select("quantity")
+        .eq("name", productName)
+        .single();
+
+      if (fetchProductError) {
+        console.error(
+          `Error fetching product data for ${productName}:`,
+          fetchProductError.message
+        );
+        return res
+          .status(500)
+          .json({ error: `Failed to fetch product data for ${productName}` });
+      }
+
+      if (quantity > productData.quantity) {
+        return res.status(400).json({
+          error: `Insufficient stock for ${productName}. Only ${productData.quantity} items available.`,
+        });
+      }
+    }
+
+    const razorpay = new Razorpay({
+      key_id: razorpayId,
+      key_secret: razorpaySecret,
     });
+
+    const orderItems = orderDetails
+      .map(
+        (item) => `- **${item.productName}**: ₹${item.price} x ${item.quantity}`
+      )
+      .join("\n");
+
+    const paymentLinkData = {
+      upi_link: false,
+      amount: amount * 100,
+      currency: "INR",
+      accept_partial: false,
+      first_min_partial_amount: 100,
+      expire_by: Math.floor(Date.now() / 1000) + 86400,
+      reference_id: `TS${Date.now()}${Math.floor(Math.random() * 1000)}`,
+      description: `Payment for ${customerName}`,
+      customer: {
+        contact: customerContact,
+        email: customerEmail,
+        name: customerName,
+      },
+      notify: { sms: true, email: true },
+      reminder_enable: true,
+      notes: {
+        customer_id: customerId,
+        customerName,
+        customerAddress,
+        orderItems,
+        amount,
+      },
+      callback_url: "https://lure-skin-studio.onrender.com/cart",
+      callback_method: "get",
+    };
+
+    let paymentLink;
+    try {
+      console.log("Creating payment link...");
+      paymentLink = await razorpay.paymentLink.create(paymentLinkData);
+      console.log("Payment link created:", paymentLink.short_url);
+    } catch (error) {
+      console.error("Error creating payment link:", error.message);
+      return res.status(500).json({ error: "Failed to create payment link" });
+    }
+
+    const message = `
+    Hello ${customerName},
+
+    Thank you for your order!
+
+    Here are the payment details:
+    - Amount: ₹${amount}
+    - Description: Payment for ${customerName}
+
+    Order Details:
+    ${orderItems}
+
+    Delivery Address:
+    ${customerAddress}
+
+    Click the link below to complete your payment:
+    ${paymentLink.short_url}
+
+    If you have any questions, feel free to reply to this message.
+
+    Thank you for shopping with us!`;
+
+    try {
+      console.log("Sending SMS message to:", customerContact);
+
+      // if (!hasContacted) {
+      //   console.log("Customer not contacted before, sending template message...");
+      //   await axios.post(
+      //     `https://graph.facebook.com/v21.0/${whatsappId}/messages`,
+      //     {
+      //       messaging_product: "whatsapp",
+      //       to: customerContact,
+      //       type: "template",
+      //       template: { name: "hello_world", language: { code: "en_US" } },
+      //     },
+      //     { headers: { Authorization: `Bearer ${whatsappToken}`, "Content-Type": "application/json" } }
+      //   );
+
+      //   const { error: updateError } = await supabase
+      //     .from("users")
+      //     .update({ hasContacted: true })
+      //     .eq("phone", customerContact);
+
+      //   if (updateError) {
+      //     console.error("Error updating contact status:", updateError.message);
+      //   } else {
+      //     console.log("User marked as contacted.");
+      //   }
+
+      //   return res.status(200).json({
+      //     message: "Payment link created and template sent via WhatsApp",
+      //     paymentLink: paymentLink.short_url,
+      //   });
+      // } else {
+      //   console.log("Customer already contacted, sending detailed payment info...");
+      //   await axios.post(
+      //     `https://graph.facebook.com/v21.0/${whatsappId}/messages`,
+      //     {
+      //       messaging_product: "whatsapp",
+      //       to: customerContact,
+      //       type: "text",
+      //       text: { body: message },
+      //     },
+      //     { headers: { Authorization: `Bearer ${whatsappToken}`, "Content-Type": "application/json" } }
+      //   );
+
+      //   console.log("Detailed payment info sent successfully.");
+      //   return res.status(200).json({
+      //     message: "Payment link created and detailed info sent via WhatsApp",
+      //     paymentLink: paymentLink.short_url,
+      //   });
+      // }
+      await client.messages.create({
+        body: message,
+        from: twilioPhoneNumber,
+        to: customerContact,
+      });
+
+      console.log("SMS sent successfully.");
+      return res.status(200).json({
+        message: "Payment link created and sent via SMS",
+        paymentLink: paymentLink.short_url,
+      });
+    } catch (error) {
+      console.error("Error sending SMS message:", error.message);
+      return res.status(500).json({
+        error: "Failed to send SMS message, but payment link was created",
+        paymentLink: paymentLink.short_url,
+      });
+    }
+  } catch (error) {
+    console.error("Unexpected error:", error.message);
+    return res.status(500).json({ error: "Internal server error" });
   }
-} catch (error) {
-  console.error("Error sending WhatsApp message:", error.message);
-  res.status(500).json({
-    error: "Failed to send WhatsApp message, but payment link was created",
-    paymentLink: paymentLink.short_url,
-  });
-}
 });
 
 app.post("/verification", async (req, res) => {
-  const SECRET = "X41romc$4F";
+  const shasum = crypto.createHmac("sha256", razorpayWebhookSecret);
+  shasum.update(JSON.stringify(req.body));
+  const expectedSignature = shasum.digest("hex");
   const signature = req.headers["x-razorpay-signature"];
-  const payload = JSON.stringify(req.body);
-  const expectedSignature = crypto
-    .createHmac("sha256", SECRET)
-    .update(payload)
-    .digest("hex");
-
+  console.log(expectedSignature, signature);
   if (signature === expectedSignature) {
     console.log("Valid webhook received:", req.body);
 
@@ -523,7 +602,22 @@ app.post("/verification", async (req, res) => {
 
     if (event === "payment_link.paid") {
       const customer_id = payload.payment_link.entity.notes.customer_id;
+      const customerName = payload.payment_link.entity.notes.customerName;
+      const customerAddress =
+        payload.payment_link.entity.notes.address || "Address not provided";
+      const orderDetails = payload.payment_link.entity.notes.orderItems;
+      const amount = payload.payment_link.entity.notes.amount;
+      const message = `
+      🛍 *New Order Payment Received!*
+        
+      👤 *Customer Name:* ${customerName}  
+      🏠 *Address:* ${customerAddress}  
+      💰 *Total Amount:* ₹${amount}  
 
+      📦 *Order Details:*  
+      ${orderDetails}
+
+      ✅ Payment confirmed & cart cleared.`;
       try {
         const { data: cartItems, error: fetchError } = await supabase
           .from("cart")
@@ -542,11 +636,12 @@ app.post("/verification", async (req, res) => {
             const { p_id: product_id, quantity } = item;
 
             try {
-              const { data: productData, error: fetchProductError } = await supabase
-                .from("products")
-                .select("quantity, quantity_sold")
-                .eq("id", product_id)
-                .single();
+              const { data: productData, error: fetchProductError } =
+                await supabase
+                  .from("products")
+                  .select("quantity")
+                  .eq("id", product_id)
+                  .single();
 
               if (fetchProductError) {
                 console.error(
@@ -557,7 +652,8 @@ app.post("/verification", async (req, res) => {
               }
 
               const updatedQuantity = productData.quantity - quantity;
-              const updatedQuantitySold = (productData.quantity_sold || 0) + quantity;
+              const updatedQuantitySold =
+                (productData.quantity_sold || 0) + quantity;
 
               const { error: updateError } = await supabase
                 .from("products")
@@ -597,6 +693,32 @@ app.post("/verification", async (req, res) => {
               .json({ error: "Failed to clear cart after payment" });
           }
         }
+        try {
+          console.log("Sending order confirmation to admin...");
+          // await axios.post(
+          //   "https://graph.facebook.com/v21.0/${whatsappId}/messages",
+          //   {
+          //     messaging_product: "whatsapp",
+          //     to: "919629030156",
+          //     type: "text",
+          //     text: { body: message },
+          //   },
+          //   {
+          //     headers: {
+          //       Authorization: `Bearer ${whatsappToken}`,
+          //       "Content-Type": "application/json",
+          //     },
+          //   }
+          // );
+          await client.messages.create({
+            body: message,
+            from: twilioPhoneNumber,
+            to: "+919778440565",
+          });
+          console.log("SMS notification sent to admin successfully.");
+        } catch (error) {
+          console.error("Error sending SMS message to admin:", error.message);
+        }
 
         console.log("Payment success tasks completed successfully");
         res.status(200).json({ message: "Payment processed and cart cleared" });
@@ -634,11 +756,11 @@ app.post("/add-to-cart", verifyToken, async (req, res) => {
 
     if (cart) {
       console.log("Cart found for customer_id:", customer_id);
-      let items = cart.items ? [...cart.items] : []; // Initialize items as an array if null
+      let items = cart.items ? [...cart.items] : [];
       let found = false;
 
       items = items.map((item) => {
-        if (item.p_id === p_id) {
+        if (item && item.p_id === p_id) {
           found = true;
           return { ...item, quantity: item.quantity + quantity };
         } else {
@@ -708,117 +830,148 @@ app.post("/add-to-cart", verifyToken, async (req, res) => {
   }
 });
 
-app.post("/delete-from-cart",verifyToken,async(req,res)=>{
-  const {id}=req.body;
+app.post("/delete-from-cart", verifyToken, async (req, res) => {
+  const { id } = req.body;
   const customer_id = req.id;
 
   try {
-    const {data:carts,error:fetchError}=await supabase.from('cart').select('items').eq('customer_id',customer_id);
-    const cart=carts && carts.length!=0 ? carts[0]:null;
-    if(cart){
-      let items= cart.items?.length==0 ? [] : cart.items;
-      items=items.map((item)=>{
-        if(item.p_id==id){
-          return null;
-        }
-      })
+    const { data: carts, error: fetchError } = await supabase
+      .from("cart")
+      .select("items")
+      .eq("customer_id", customer_id);
+    const cart = carts && carts.length != 0 ? carts[0] : null;
+    if (cart) {
+      let items = cart.items?.length == 0 ? [] : cart.items;
+      items = items.filter((item) => item && item.p_id !== id);
+      console.log(items);
       try {
-        const {data:updatedCart,error:updateError}=await supabase.from('cart').update({items}).eq('customer_id',customer_id).select();
-        if(updatedCart){
+        const { data: updatedCart, error: updateError } = await supabase
+          .from("cart")
+          .update({ items })
+          .eq("customer_id", customer_id)
+          .select();
+        if (updatedCart) {
           res.status(201).json({
-            message:"Item successfully deleted !!!",
-            data:updatedCart
-          })
-        }else throw updateError
+            message: "Item successfully deleted !!!",
+            data: updatedCart,
+          });
+        } else throw updateError;
       } catch (error) {
         res.status(500).json({
-          message:"Item could not be deleted !!!",
-          error:error
-        })
+          message: "Item could not be deleted !!!",
+          error: error,
+        });
       }
-    }else{
+    } else {
       throw fetchError;
     }
   } catch (error) {
     res.status(500).json({
-      message:"Cart could not be fetched",
-      error:error
-    })
+      message: "Cart could not be fetched",
+      error: error,
+    });
   }
-})
+});
 
-app.post("/delete-cart",verifyToken,async(req,res)=>{
-  const {customer_id}=req.body;
+app.post("/delete-cart", verifyToken, async (req, res) => {
+  const { customer_id } = req.body;
   try {
-    const {data:carts,error:fetchError}=await supabase.from('cart').select('items').eq('customer_id',customer_id);
-    const cart=carts && carts.length!=0 ? carts[0]:null;
-    if(cart){
-      let items= cart.items?.length==0 ? [] : cart.items;
-      items=null
+    const { data: carts, error: fetchError } = await supabase
+      .from("cart")
+      .select("items")
+      .eq("customer_id", customer_id);
+    const cart = carts && carts.length != 0 ? carts[0] : null;
+    if (cart) {
+      let items = cart.items?.length == 0 ? [] : cart.items;
+      items = null;
       try {
-        const {data:updatedCart,error:updateError}=await supabase.from('cart').update({items}).eq('customer_id',customer_id).select();
-        if(updatedCart){
+        const { data: updatedCart, error: updateError } = await supabase
+          .from("cart")
+          .update({ items })
+          .eq("customer_id", customer_id)
+          .select();
+        if (updatedCart) {
           res.status(201).json({
-            message:"Cart successfully deleted !!!",
-            data:updatedCart
-          })
-        }else throw updateError
+            message: "Cart successfully deleted !!!",
+            data: updatedCart,
+          });
+        } else throw updateError;
       } catch (error) {
         res.status(500).json({
-          message:"Cart could not be deleted !!!",
-          error:error
-        })
+          message: "Cart could not be deleted !!!",
+          error: error,
+        });
       }
-    }else{
+    } else {
       throw fetchError;
     }
   } catch (error) {
     res.status(500).json({
-      message:"Cart could not be fetched",
-      error:error
-    })
+      message: "Cart could not be fetched",
+      error: error,
+    });
   }
-})
+});
 
-app.post("/get-cart",verifyToken,async(req,res)=>{
-  const {customer_id}=req.body;
+app.post("/get-cart", verifyToken, async (req, res) => {
+  const { customer_id } = req.body;
   try {
-    const {data:carts,error:fetchError}=await supabase.from('cart').select('items').eq('customer_id',customer_id)
-    if(fetchError) throw fetchError
-    if(carts){
-      res.status(201).json({data:carts})
+    const { data: carts, error: fetchError } = await supabase
+      .from("cart")
+      .select("items")
+      .eq("customer_id", customer_id);
+    if (fetchError) throw fetchError;
+    if (carts) {
+      res.status(201).json({ data: carts });
     }
   } catch (error) {
-    res.status(500).json({message:error.message})
+    res.status(500).json({ message: error.message });
   }
-})
+});
 
-app.get("/get-products",async(req,res)=>{
+app.get("/get-products", async (req, res) => {
   try {
-    const {data:products,error:fetchError}=await supabase.from('products').select('*')
-    if(fetchError) throw fetchError
-    if(products){
-      res.status(201).json({data:products})
+    const { data: products, error: fetchError } = await supabase
+      .from("products")
+      .select("*");
+    if (fetchError) throw fetchError;
+    if (products) {
+      res.status(201).json({ data: products });
     }
   } catch (error) {
-    res.status(500).json({message:error.message})
+    res.status(500).json({ message: error.message });
   }
-})
+});
 
-app.post("/get-product",async(req,res)=>{
-  const {p_id}=req.body;
+app.post("/get-product", async (req, res) => {
+  const { p_id } = req.body;
   try {
-    const {data:products,error:fetchError}=await supabase.from('products').select('*').eq('id',p_id)
-    if(fetchError) throw fetchError
-    if(products){
-      res.status(201).json({data:products})
+    const { data: products, error: fetchError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", p_id);
+    if (fetchError) throw fetchError;
+    if (products) {
+      res.status(201).json({ data: products });
     }
   } catch (error) {
-    res.status(500).json({message:error.message})
+    res.status(500).json({ message: error.message });
   }
-})
+});
 
-const PORT = 5001;
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname1, "build")));
+
+  app.get("*", (req, res) =>
+    res.sendFile(path.resolve(__dirname1, "build", "index.html"))
+  );
+} else {
+  app.get("/", (req, res) => {
+    res.send("API is running..");
+  });
+}
+
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`The server is running on port ${PORT}`);
 });

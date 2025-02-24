@@ -49,8 +49,7 @@ const Products = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await axios.get("http://localhost:5001/get-products");
-        console.log(response);
+        const response = await axios.get("https://lure-skin-studio.onrender.com/get-products");
         const temp_soaps = response.data.data.filter((product) =>
           product.name.toLowerCase().includes("soap")
         );
@@ -154,12 +153,21 @@ const Products = () => {
     };
   };
 
-  const handleIncrement = () => setQuantity((prev) => prev + 1);
+  const handleIncrement = (product) => {
+    setQuantity((prev) => {
+      if (prev < product.quantity) {
+        return prev + 1;
+      } else {
+        alert(`Maximum quantity available: ${product.quantity}`);
+        return prev;
+      }
+    });
+  };
+  
   const handleDecrement = () => setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
 
   const handleConfirm = async (product) => {
     const authToken = localStorage.getItem("token");
-    console.log(quantity);
     if (!authToken) {
       alert("User is not authenticated. Please log in.");
       return;
@@ -172,7 +180,7 @@ const Products = () => {
     };
     try {
       const response = await axios.post(
-        "http://localhost:5001/add-to-cart",
+        "https://lure-skin-studio.onrender.com/add-to-cart",
         payload,
         {
           headers: {
@@ -182,7 +190,7 @@ const Products = () => {
       );
 
       if (response.status === 201) {
-        console.log("Cart updated successfully:", response.data.data);
+        // console.log("Cart updated successfully:", response.data.data);
         alert("Cart updated successfully");
       }
 
@@ -209,11 +217,17 @@ const Products = () => {
           const isExpanded = showQuantitySelector === product; // Check if the tile should be expanded
           return (
             <div key={index} className={`product-card ${isExpanded ? "expanded" : ""}`}>
+              {product.quantity === 0 ? (
+                <div className="out-of-stock">Out of Stock!</div>
+                ) : product.quantity <= 5 && (
+                <div className="product-stock-alert">Going out of stock!</div>
+)}
+<br/>
               <img src={product.images[0]} alt={product.name} className="product-image" onClick={() => openModal(product)} />
 
               <div className="product-details text-left">
-                <p className="product-price">Price: Rs {product.price}</p>
                 <h6 className="product-name">{product.name}</h6>
+                <p className="product-price">Price: Rs {product.price}</p>
               </div>
 
               {/* Cart Icon with Expansion Control */}
@@ -233,7 +247,7 @@ const Products = () => {
                   <div className="quantity-controls">
                     <button onClick={handleDecrement}>-</button>
                     <span>{quantity}</span>
-                    <button onClick={handleIncrement}>+</button>
+                    <button onClick={() => handleIncrement(product)}>+</button>
                   </div>
                   <div className="quantity-actions">
                     <button onClick={() => handleConfirm(product)} className="confirm-btn">Confirm</button>
@@ -350,7 +364,12 @@ const Products = () => {
         </>
       )}
 
-      <ProductModal product={selectedProduct} onClose={closeModal} />
+      <ProductModal
+        product={selectedProduct}
+        onClose={closeModal}
+        maxQuantity={selectedProduct?.quantity}
+      />
+
     </div>
   );
 };

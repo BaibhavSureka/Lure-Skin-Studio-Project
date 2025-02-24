@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate, useLocation } from "react-router-dom";
 import "./input.css";
 import Admin from "./components/admin.jsx";
 import Navbar from "./components/Navbar.jsx";
@@ -13,17 +13,48 @@ import Products from "./components/products.jsx";
 import Blog from "./components/blog.jsx";
 import Policy from "./components/policy.jsx";
 import CartPage from "./components/Cart.jsx";
-import PaymentTest from "./components/PaymentTest.jsx";
 import Login from "./components/Login.jsx";
 import Register from "./components/Register.jsx";
 import Profile from "./components/Profile.jsx";
 
-function App() {
-  const PrivateRoute = ({ children }) => {
-    const token = localStorage.getItem("token");
-    return token ? children : <Navigate to="/login" />;
+function PopupRedirect() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [showPopup, setShowPopup] = useState(false);
+  const isLoggedIn = localStorage.getItem("token");
+
+  useEffect(() => {
+    if (!isLoggedIn && location.pathname === "/") {
+      const timer = setTimeout(() => {
+        setShowPopup(true);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, isLoggedIn]);
+
+  const handleLoginRedirect = () => {
+    setShowPopup(false);
+    navigate("/login");
   };
 
+  return (
+    showPopup && (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+        <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+          <p className="text-lg font-semibold">You need to be logged in to continue.</p>
+          <button
+            onClick={handleLoginRedirect}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
+  );
+}
+
+function App() {
   useEffect(() => {
     const loadingScreen = document.querySelector(".loading");
 
@@ -52,6 +83,7 @@ function App() {
         <div className="loading"></div>
 
         <Navbar />
+        <PopupRedirect />
 
         <Routes>
           {/* Public Routes */}
@@ -63,39 +95,9 @@ function App() {
           <Route path="/register" element={<Register />} />
 
           {/* Protected Routes */}
-          <Route
-            path="/cart"
-            element={
-              <PrivateRoute>
-                <CartPage cartItems={cartItems} />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/payment"
-            element={
-              <PrivateRoute>
-                <PaymentTest />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            }
-          />
-
-          <Route
-            path="/admin"
-            element={
-              //add private route here
-                <Admin />
-               
-            }
-          />
+          <Route path="/cart" element={<CartPage cartItems={cartItems} />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/admin" element={<Admin />} />
         </Routes>
 
         <Footer />

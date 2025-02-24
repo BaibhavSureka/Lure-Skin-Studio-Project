@@ -11,6 +11,12 @@ const CartPage = () => {
   const [customerEmail, setCustomerEmail] = useState("");
 
   useEffect(() => {
+    localStorage.setItem("cartItemCount", JSON.stringify(cartItems.length));
+    window.dispatchEvent(new Event("storage")); // Notify other components
+  }, [cartItems]);
+
+  
+  useEffect(() => {
     const fetchCartItems = async () => {
       const token = localStorage.getItem("token");
       let customer_id;
@@ -32,7 +38,7 @@ const CartPage = () => {
           return;
         }
         const response = await axios.post(
-          "http://localhost:5001/get-cart",
+          "https://lure-skin-studio.onrender.com/get-cart",
           { customer_id },
           {
             headers: {
@@ -42,16 +48,19 @@ const CartPage = () => {
         );
 
         if (response.data && response.data.data) {
-          const items = response.data.data[0].items.map(item => ({
-            product_name: item.name,
-            p_id: item.p_id,
-            MRP: item.price,
-            quantity: item.quantity
-          }));
+          const items = response.data.data[0].items
+            .filter(item => item)
+            .map(item => ({
+              product_name: item.name,
+              p_id: item.p_id,
+              MRP: item.price,
+              quantity: item.quantity
+            }));
           setCartItems(items);
         } else {
           alert("No cart items found.");
         }
+        
       } catch (error) {
         console.error("Error fetching cart:", error.response?.data || error.message);
         alert("Failed to load cart items.");
@@ -90,7 +99,7 @@ const CartPage = () => {
   
     try {
       const response = await axios.post(
-        "http://localhost:5001/create-and-send-payment-link",
+        "https://lure-skin-studio.onrender.com/create-and-send-payment-link",
         jsonData,
         {
           headers: {
@@ -101,7 +110,7 @@ const CartPage = () => {
       );
   
       if (response.status === 200) {
-        console.log("Payment link created successfully:", response.data);
+        // console.log("Payment link created successfully:", response.data);
         alert(
           `Payment link created successfully! Please complete your payment: ${response.data.paymentLink}`
         );
@@ -137,7 +146,7 @@ const clearCart = async () => {
     }
 
     const response = await axios.post(
-      "http://localhost:5001/delete-cart",
+      "https://lure-skin-studio.onrender.com/delete-cart",
       { customer_id },
       {
         headers: {
@@ -147,7 +156,7 @@ const clearCart = async () => {
     );
 
     if (response.status === 201) {
-      console.log("Cart successfully deleted:", response.data);
+      // console.log("Cart successfully deleted:", response.data);
       alert(response.data.message);
       setCartItems([]);
     } else {
@@ -173,7 +182,7 @@ const handleDelete = async (item) => {
 
   try {
     const response = await axios.post(
-      "http://localhost:5001/delete-from-cart",
+      "https://lure-skin-studio.onrender.com/delete-from-cart",
       { id: item.p_id },
       {
         headers: {
